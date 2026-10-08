@@ -1,0 +1,1130 @@
+```react
+import React, { useState, useEffect } from 'react';
+import { 
+  Phone, MessageSquare, MapPin, Clock, Mail, Calendar, 
+  ChevronDown, ChevronUp, CheckCircle, Menu, X, 
+  ShieldCheck, Award, Heart, Sparkles, ArrowRight, Copy, ExternalLink, Info, Stethoscope
+} from 'lucide-react';
+
+// Central Business Configuration object as specified in the brief
+const CLINIC_CONFIG = {
+  name: "Eversmile Dental Clinic",
+  dentist: "Dr. Mital Singhi",
+  qualification: "B.D.S. (Bachelor of Dental Surgery)",
+  registrationNumber: "A-9132 (Pending verification)",
+  address: "Shop No. 11, Near Dhara Dairy, Near Axis Bank, Veera Desai Road, Azad Nagar, Andheri West, Mumbai, Maharashtra 400053, India",
+  buildingReference: "Venus Tower",
+  phones: {
+    primary: "7738385205",
+    secondary: "7666204084",
+    mapsPhone: "085915 39164",
+    whatsappNumber: "917738385205" // Verified WhatsApp format
+  },
+  email: "mitalsinghi@yahoo.com",
+  domain: "eversmiledental.co.in",
+  hours: {
+    morning: "10:00 AM – 2:00 PM",
+    evening: "5:00 PM – 9:00 PM",
+    note: "Weekly opening days require confirmation with the clinic."
+  },
+  ratingInfo: {
+    rating: "4.9",
+    reviewCount: "72",
+    disclaimer: "Based on historical Google listing data; please verify current status."
+  },
+  googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Eversmile+Dental+Clinic+Andheri+West+Mumbai",
+  treatments: [
+    { id: "checkup", name: "General Dental Check-up", description: "Comprehensive oral examination and preventive health guidance.", enabled: true, icon: "Stethoscope" },
+    { id: "cleaning", name: "Teeth Cleaning", description: "Professional scaling and polishing to remove plaque and tartar.", enabled: true, icon: "Sparkles" },
+    { id: "rootcanal", name: "Root Canal Treatment", description: "Save damaged or infected teeth with precise endodontic care.", enabled: true, icon: "ShieldCheck" },
+    { id: "fillings", name: "Dental Fillings", description: "Restore decayed or chipped teeth with tooth-colored composite materials.", enabled: true, icon: "CheckCircle" },
+    { id: "implants", name: "Dental Implants", description: "Permanent, natural-looking tooth replacement solutions.", enabled: true, icon: "Award" },
+    { id: "extraction", name: "Tooth Extraction", description: "Safe and gentle removal of compromised or wisdom teeth.", enabled: true, icon: "Info" },
+    { id: "gumcare", name: "Gum Care", description: "Periodontal treatments to maintain healthy gums and bone support.", enabled: true, icon: "Heart" },
+    { id: "cosmetic", name: "Cosmetic Dentistry", description: "Enhance your smile aesthetics with professional teeth whitening and bonding.", enabled: true, icon: "Sparkles" }
+  ]
+};
+
+// Helper utility for generating WhatsApp links
+const getWhatsAppLink = (message) => {
+  const encoded = encodeURIComponent(message);
+  return `https://wa.me/${CLINIC_CONFIG.phones.whatsappNumber}?text=${encoded}`;
+};
+
+export default function App() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  // Appointment Form State
+  const [formData, setFormData] = useState({
+    fullName: '',
+    mobile: '',
+    date: '',
+    timeSlot: 'Morning Session (10 AM - 2 PM)',
+    treatment: CLINIC_CONFIG.treatments[0].name,
+    message: ''
+  });
+  const [formErrors, setFormErrors] = useState({});
+
+  // FAQ Accordion State
+  const [openFaq, setOpenFaq] = useState(null);
+
+  // Toast notification helper
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
+
+  const handleCopyAddress = () => {
+    const textToCopy = CLINIC_CONFIG.address;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        setCopiedAddress(true);
+        showToast("Address copied to clipboard!");
+        setTimeout(() => setCopiedAddress(false), 3000);
+      });
+    } else {
+      // Fallback for iframe restrictions
+      const textArea = document.createElement("textarea");
+      textArea.value = textToCopy;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopiedAddress(true);
+        showToast("Address copied to clipboard!");
+        setTimeout(() => setCopiedAddress(false), 3000);
+      } catch (err) {
+        showToast("Failed to copy address.");
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!formData.fullName.trim()) errors.fullName = "Full name is required.";
+    if (!formData.mobile.trim()) {
+      errors.mobile = "Mobile number is required.";
+    } else if (!/^[0-9]{10}$/.test(formData.mobile.trim())) {
+      errors.mobile = "Please enter a valid 10-digit Indian mobile number.";
+    }
+    if (!formData.date) {
+      errors.date = "Please select a preferred date.";
+    } else {
+      const selectedDate = new Date(formData.date);
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      if (selectedDate < today) {
+        errors.date = "Cannot select past dates.";
+      }
+    }
+    return errors;
+  };
+
+  const handleAppointmentSubmit = (e) => {
+    e.preventDefault();
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    // Construct WhatsApp message
+    const msg = `Hello Eversmile Dental Clinic,\n\nI would like to request an appointment:\n• Name: ${formData.fullName}\n• Mobile: ${formData.mobile}\n• Preferred Date: ${formData.date}\n• Time Slot: ${formData.timeSlot}\n• Interested In: ${formData.treatment}\n• Notes: ${formData.message || 'None'}\n\nPlease confirm availability. Thank you!`;
+    
+    window.open(getWhatsAppLink(msg), '_blank');
+    showToast("Opening WhatsApp with your appointment request...");
+  };
+
+  return (
+    <div className="min-h-screen bg-[#E8F6F4]/30 text-[#202B33] font-sans antialiased selection:bg-[#087F8C] selection:text-white pb-20 md:pb-0">
+      
+      {}
+      {toastMessage && (
+        <div className="fixed top-20 right-4 z-50 bg-[#202B33] text-white px-5 py-3 rounded-xl shadow-2xl border border-[#087F8C] flex items-center gap-3 animate-bounce">
+          <Info className="w-5 h-5 text-[#8ABF44]" />
+          <span className="text-sm font-medium">{toastMessage}</span>
+        </div>
+      )}
+
+      {}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          
+          {/* Logo */}
+          <a href="#" className="flex items-center gap-3 group focus:outline-none focus:ring-2 focus:ring-[#087F8C] rounded-lg p-1">
+            <div className="w-10 h-10 rounded-xl bg-[#087F8C] flex items-center justify-center text-white shadow-md group-hover:bg-[#066570] transition-colors">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            </div>
+            <div>
+              <span className="block font-bold text-lg text-[#202B33] font-['Poppins'] tracking-tight leading-none">EVERSMILE</span>
+              <span className="block text-xs font-semibold text-[#087F8C] tracking-widest uppercase mt-0.5">Dental Clinic</span>
+            </div>
+          </a>
+
+          {/* Desktop Nav Links */}
+          <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-gray-700">
+            <a href="#home" className="hover:text-[#087F8C] transition-colors">Home</a>
+            <a href="#about" className="hover:text-[#087F8C] transition-colors">About Us</a>
+            <a href="#treatments" className="hover:text-[#087F8C] transition-colors">Treatments</a>
+            <a href="#why-us" className="hover:text-[#087F8C] transition-colors">Why Choose Us</a>
+            <a href="#reviews" className="hover:text-[#087F8C] transition-colors">Reviews</a>
+            <a href="#location" className="hover:text-[#087F8C] transition-colors">Location</a>
+            <a href="#faq" className="hover:text-[#087F8C] transition-colors">FAQ</a>
+          </nav>
+
+          {/* Header Action CTA */}
+          <div className="hidden sm:flex items-center gap-3">
+            <a 
+              href={`tel:${CLINIC_CONFIG.phones.primary}`}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#087F8C] text-[#087F8C] hover:bg-[#E8F6F4] font-medium text-sm transition-all focus:ring-2 focus:ring-[#087F8C]"
+            >
+              <Phone className="w-4 h-4" />
+              <span>Call Now</span>
+            </a>
+            <a 
+              href="#appointment"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#087F8C] text-white hover:bg-[#066570] font-medium text-sm shadow-md transition-all focus:ring-2 focus:ring-[#087F8C]"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Book Appointment</span>
+            </a>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <button 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden p-2.5 rounded-xl text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#087F8C]"
+            aria-label="Toggle Navigation Menu"
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
+
+        {/* Mobile Navigation Dropdown */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden bg-white border-b border-gray-100 px-4 pt-2 pb-6 space-y-3 shadow-lg animate-fadeIn">
+            <a 
+              href="#home" 
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2.5 px-3 rounded-lg text-gray-700 hover:bg-[#E8F6F4] hover:text-[#087F8C] font-medium"
+            >
+              Home
+            </a>
+            <a 
+              href="#about" 
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2.5 px-3 rounded-lg text-gray-700 hover:bg-[#E8F6F4] hover:text-[#087F8C] font-medium"
+            >
+              About Us
+            </a>
+            <a 
+              href="#treatments" 
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2.5 px-3 rounded-lg text-gray-700 hover:bg-[#E8F6F4] hover:text-[#087F8C] font-medium"
+            >
+              Treatments
+            </a>
+            <a 
+              href="#why-us" 
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2.5 px-3 rounded-lg text-gray-700 hover:bg-[#E8F6F4] hover:text-[#087F8C] font-medium"
+            >
+              Why Choose Us
+            </a>
+            <a 
+              href="#reviews" 
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2.5 px-3 rounded-lg text-gray-700 hover:bg-[#E8F6F4] hover:text-[#087F8C] font-medium"
+            >
+              Reviews
+            </a>
+            <a 
+              href="#location" 
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2.5 px-3 rounded-lg text-gray-700 hover:bg-[#E8F6F4] hover:text-[#087F8C] font-medium"
+            >
+              Location & Hours
+            </a>
+            <a 
+              href="#faq" 
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2.5 px-3 rounded-lg text-gray-700 hover:bg-[#E8F6F4] hover:text-[#087F8C] font-medium"
+            >
+              FAQ
+            </a>
+            <div className="pt-2 flex flex-col gap-2">
+              <a 
+                href={`tel:${CLINIC_CONFIG.phones.primary}`}
+                className="w-full py-3 rounded-xl border border-[#087F8C] text-[#087F8C] text-center font-medium flex items-center justify-center gap-2"
+              >
+                <Phone className="w-4 h-4" />
+                <span>Call Clinic</span>
+              </a>
+              <a 
+                href="#appointment" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full py-3 rounded-xl bg-[#087F8C] text-white text-center font-medium shadow-md flex items-center justify-center gap-2"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Book Appointment</span>
+              </a>
+            </div>
+          </div>
+        )}
+      </header>
+
+      {}
+      <section id="home" className="relative overflow-hidden bg-gradient-to-b from-[#E8F6F4]/60 to-white py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            {/* Left Content */}
+            <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#E8F6F4] border border-[#087F8C]/20 text-[#087F8C] text-xs font-semibold uppercase tracking-wider">
+                <Sparkles className="w-4 h-4 text-[#8ABF44]" />
+                <span>Andheri West, Mumbai</span>
+              </div>
+              
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#202B33] font-['Poppins'] tracking-tight leading-[1.15]">
+                Your Smile Deserves the <span className="text-[#087F8C]">Best Care.</span>
+              </h1>
+              
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
+                Welcome to Eversmile Dental Clinic, where your comfort and oral health come first. Visit <strong className="text-[#202B33] font-semibold">Dr. Mital Singhi (B.D.S.)</strong> at Veera Desai Road, Andheri West, Mumbai, for personalised dental care.
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
+                <a 
+                  href="#appointment"
+                  className="w-full sm:w-auto px-8 py-4 rounded-xl bg-[#087F8C] text-white font-semibold hover:bg-[#066570] shadow-lg shadow-[#087F8C]/20 transition-all flex items-center justify-center gap-2 text-base focus:ring-4 focus:ring-[#087F8C]/30"
+                >
+                  <Calendar className="w-5 h-5" />
+                  <span>Book an Appointment</span>
+                </a>
+                
+                <a 
+                  href={`tel:${CLINIC_CONFIG.phones.primary}`}
+                  className="w-full sm:w-auto px-8 py-4 rounded-xl border-2 border-[#087F8C] text-[#087F8C] font-semibold hover:bg-[#E8F6F4] transition-all flex items-center justify-center gap-2 text-base"
+                >
+                  <Phone className="w-5 h-5" />
+                  <span>Call the Clinic</span>
+                </a>
+
+                <a 
+                  href={CLINIC_CONFIG.googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full sm:w-auto px-6 py-4 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-all flex items-center justify-center gap-2 text-base"
+                >
+                  <MapPin className="w-5 h-5 text-[#087F8C]" />
+                  <span>Get Directions</span>
+                </a>
+              </div>
+
+              {/* Trust Badge Bar */}
+              <div className="pt-6 border-t border-gray-200/60 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-gray-500 font-medium">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-[#8ABF44]" />
+                  <span>Qualified B.D.S. Dentist</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-[#087F8C]" />
+                  <span>Morning & Evening Hours</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-[#8ABF44]" />
+                  <span>Easy Access in Andheri West</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Hero Image Card */}
+            <div className="lg:col-span-5">
+              <div className="relative mx-auto max-w-md lg:max-w-none">
+                <div className="absolute -inset-2 bg-gradient-to-tr from-[#087F8C] to-[#8ABF44] rounded-3xl opacity-20 blur-xl"></div>
+                <div className="relative bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-gray-100 space-y-6">
+                  
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-[#E8F6F4] text-[#087F8C] flex items-center justify-center font-bold text-xl">
+                        DS
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-[#202B33] font-['Poppins']">Dr. Mital Singhi</h3>
+                        <p className="text-xs text-[#087F8C] font-semibold">B.D.S. Dental Surgeon</p>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#8ABF44]/10 text-[#8ABF44] text-xs font-bold">
+                      Verified
+                    </span>
+                  </div>
+
+                  <div className="space-y-4 text-sm text-gray-600">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-5 h-5 text-[#087F8C] shrink-0 mt-0.5" />
+                      <span>{CLINIC_CONFIG.address}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Clock className="w-5 h-5 text-[#087F8C] shrink-0" />
+                      <div>
+                        <p className="font-medium text-[#202B33]">Clinic Timings:</p>
+                        <p>Morning: {CLINIC_CONFIG.hours.morning}</p>
+                        <p>Evening: {CLINIC_CONFIG.hours.evening}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#E8F6F4] p-4 rounded-2xl border border-[#087F8C]/10 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-[#087F8C] uppercase">Google Rating Preview</p>
+                      <p className="text-lg font-bold text-[#202B33]">4.9 / 5.0 <span className="text-xs font-normal text-gray-500">(72 Reviews)</span></p>
+                    </div>
+                    <a 
+                      href={CLINIC_CONFIG.googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-[#087F8C] text-white text-xs font-semibold rounded-xl hover:bg-[#066570] transition-colors"
+                    >
+                      View Map
+                    </a>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {}
+      <section id="about" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#202B33] font-['Poppins']">
+              About Eversmile Dental Clinic
+            </h2>
+            <div className="w-20 h-1.5 bg-[#8ABF44] mx-auto rounded-full"></div>
+            <p className="text-gray-600 text-lg leading-relaxed">
+              Eversmile Dental Clinic is located on Veera Desai Road in Andheri West, Mumbai. Led by Dr. Mital Singhi, the clinic aims to provide patients with a welcoming environment for dental consultations and treatment.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-[#E8F6F4]/40 p-8 rounded-3xl border border-gray-100 hover:shadow-lg transition-all space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#087F8C] text-white flex items-center justify-center shadow-md">
+                <Heart className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold text-[#202B33] font-['Poppins']">Patient-Centric Care</h3>
+              <p className="text-gray-600 leading-relaxed text-sm">
+                We understand that visiting a dentist can sometimes feel stressful. Our goal is to make your experience comfortable by explaining your treatment options clearly.
+              </p>
+            </div>
+
+            <div className="bg-[#E8F6F4]/40 p-8 rounded-3xl border border-gray-100 hover:shadow-lg transition-all space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#8ABF44] text-white flex items-center justify-center shadow-md">
+                <ShieldCheck className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold text-[#202B33] font-['Poppins']">Informed Decisions</h3>
+              <p className="text-gray-600 leading-relaxed text-sm">
+                We empower you with all necessary information regarding your oral health so you can make confident decisions tailored to your dental needs.
+              </p>
+            </div>
+
+            <div className="bg-[#E8F6F4]/40 p-8 rounded-3xl border border-gray-100 hover:shadow-lg transition-all space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#202B33] text-white flex items-center justify-center shadow-md">
+                <MapPin className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold text-[#202B33] font-['Poppins']">Prime Location</h3>
+              <p className="text-gray-600 leading-relaxed text-sm">
+                Conveniently situated near Dhara Dairy and Axis Bank on Veera Desai Road, Azad Nagar, Andheri West, easily accessible from all parts of Mumbai.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {}
+      <section id="treatments" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#202B33] font-['Poppins']">
+              Our Treatments & Services
+            </h2>
+            <div className="w-20 h-1.5 bg-[#087F8C] mx-auto rounded-full"></div>
+            <p className="text-gray-600 text-lg leading-relaxed">
+              Explore our dental care services. All treatments are subject to professional consultation and clinical approval.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {CLINIC_CONFIG.treatments.map((treatment) => {
+              if (!treatment.enabled) return null;
+              const whatsappMsg = `Hello Eversmile Dental Clinic, I would like to enquire about ${treatment.name}. Please provide more details.`;
+              return (
+                <div key={treatment.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between group">
+                  <div className="space-y-4">
+                    <div className="w-12 h-12 rounded-2xl bg-[#E8F6F4] text-[#087F8C] flex items-center justify-center group-hover:bg-[#087F8C] group-hover:text-white transition-colors">
+                      <Stethoscope className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-lg font-bold text-[#202B33] font-['Poppins']">{treatment.name}</h3>
+                    <p className="text-gray-600 text-sm leading-relaxed">{treatment.description}</p>
+                  </div>
+                  
+                  <div className="pt-6 mt-6 border-t border-gray-100">
+                    <a 
+                      href={getWhatsAppLink(whatsappMsg)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2.5 px-4 rounded-xl bg-[#E8F6F4] text-[#087F8C] hover:bg-[#087F8C] hover:text-white font-semibold text-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Enquire via WhatsApp</span>
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {}
+      <section id="why-us" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#202B33] font-['Poppins']">
+              Your Comfort Comes First
+            </h2>
+            <div className="w-20 h-1.5 bg-[#8ABF44] mx-auto rounded-full"></div>
+            <p className="text-gray-600 text-lg leading-relaxed">
+              We focus on what matters most—delivering ethical, transparent, and high-standard patient care.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="bg-[#E8F6F4]/30 p-8 rounded-3xl border border-gray-100 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-[#087F8C] text-white flex items-center justify-center mx-auto shadow-md">
+                <Heart className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-[#202B33] font-['Poppins']">Personalised Dental Care</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Treatments tailored specifically to your unique dental requirements and health profile.
+              </p>
+            </div>
+
+            <div className="bg-[#E8F6F4]/30 p-8 rounded-3xl border border-gray-100 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-[#8ABF44] text-white flex items-center justify-center mx-auto shadow-md">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-[#202B33] font-['Poppins']">Professional Care</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Led by Dr. Mital Singhi (B.D.S.) ensuring thorough and careful clinical procedures.
+              </p>
+            </div>
+
+            <div className="bg-[#E8F6F4]/30 p-8 rounded-3xl border border-gray-100 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-[#202B33] text-white flex items-center justify-center mx-auto shadow-md">
+                <MapPin className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-[#202B33] font-['Poppins']">Convenient Location</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Easily accessible clinic location on Veera Desai Road, Andheri West with prominent landmarks.
+              </p>
+            </div>
+
+            <div className="bg-[#E8F6F4]/30 p-8 rounded-3xl border border-gray-100 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-[#087F8C] text-white flex items-center justify-center mx-auto shadow-md">
+                <Sparkles className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-[#202B33] font-['Poppins']">Clear Communication</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Transparent discussions about procedures, costs, and expectations before starting treatment.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {}
+      <section className="py-20 bg-gradient-to-br from-[#087F8C] to-[#066570] text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            <div className="lg:col-span-5 space-y-6">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 text-[#8ABF44] text-xs font-semibold uppercase tracking-wider">
+                <Award className="w-4 h-4" />
+                <span>Lead Practitioner</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold font-['Poppins']">
+                Meet Dr. Mital Singhi
+              </h2>
+              <p className="text-[#E8F6F4] text-lg leading-relaxed">
+                Dedicated dental professional committed to improving community oral health with gentleness, precision, and clinical integrity in Andheri West, Mumbai.
+              </p>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-[#8ABF44]" />
+                  </div>
+                  <span className="font-medium">Qualification: B.D.S. (Bachelor of Dental Surgery)</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                    <ShieldCheck className="w-5 h-5 text-[#8ABF44]" />
+                  </div>
+                  <span className="font-medium">Registration Number: {CLINIC_CONFIG.registrationNumber}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-7">
+              <div className="bg-white/10 backdrop-blur-md p-8 sm:p-10 rounded-3xl border border-white/20 space-y-6">
+                <h3 className="text-2xl font-bold font-['Poppins']">Our Clinical Commitment</h3>
+                <p className="text-[#E8F6F4] leading-relaxed">
+                  "At Eversmile Dental Clinic, we believe every patient deserves undivided attention and a comfortable environment. Whether you are visiting for a routine check-up or specialised treatment, our focus remains firmly on your comfort and long-term dental wellness."
+                </p>
+                <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-lg">Dr. Mital Singhi</p>
+                    <p className="text-xs text-[#E8F6F4]">Founder & Principal Dentist</p>
+                  </div>
+                  <a 
+                    href="#appointment"
+                    className="px-6 py-3 rounded-xl bg-white text-[#087F8C] font-semibold hover:bg-[#E8F6F4] transition-colors text-sm shadow-md"
+                  >
+                    Consult Dr. Singhi
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {}
+      <section id="reviews" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#202B33] font-['Poppins']">
+              What Our Patients Say
+            </h2>
+            <div className="w-20 h-1.5 bg-[#087F8C] mx-auto rounded-full"></div>
+            <p className="text-gray-600 text-lg leading-relaxed">
+              We value patient feedback. View our verified Google Maps listing to read honest reviews from our patients.
+            </p>
+          </div>
+
+          <div className="max-w-xl mx-auto bg-[#E8F6F4]/40 p-8 sm:p-10 rounded-3xl border border-gray-100 text-center space-y-6 shadow-sm">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white text-[#087F8C] shadow-md text-2xl font-bold font-['Poppins']">
+              {CLINIC_CONFIG.ratingInfo.rating}★
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-2xl font-bold text-[#202B33] font-['Poppins']">Google Business Rating</h3>
+              <p className="text-gray-600 text-sm">
+                Based on <strong className="text-[#202B33]">{CLINIC_CONFIG.ratingInfo.reviewCount} reviews</strong> on our verified Google Maps listing.
+              </p>
+              <p className="text-xs text-amber-600 bg-amber-50 py-1.5 px-3 rounded-lg inline-block mt-1">
+                Note: {CLINIC_CONFIG.ratingInfo.disclaimer}
+              </p>
+            </div>
+
+            <div className="pt-4">
+              <a 
+                href={CLINIC_CONFIG.googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-[#087F8C] text-white font-semibold hover:bg-[#066570] transition-all shadow-md text-sm"
+              >
+                <span>Read All Google Reviews</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {}
+      <section id="location" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#202B33] font-['Poppins']">
+              Location & Contact Details
+            </h2>
+            <div className="w-20 h-1.5 bg-[#8ABF44] mx-auto rounded-full"></div>
+            <p className="text-gray-600 text-lg leading-relaxed">
+              Visit our clinic in Andheri West or reach out via phone or email.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            
+            {/* Contact Info Card */}
+            <div className="bg-white p-8 sm:p-10 rounded-3xl border border-gray-100 shadow-sm space-y-8">
+              <h3 className="text-2xl font-bold text-[#202B33] font-['Poppins']">Get in Touch</h3>
+              
+              <div className="space-y-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#E8F6F4] text-[#087F8C] flex items-center justify-center shrink-0">
+                    <MapPin className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-2 flex-1">
+                    <p className="font-bold text-[#202B33]">Clinic Address</p>
+                    <p className="text-gray-600 text-sm leading-relaxed">{CLINIC_CONFIG.address}</p>
+                    <p className="text-xs text-[#087F8C] font-semibold">Building Reference: {CLINIC_CONFIG.buildingReference}</p>
+                    <button 
+                      onClick={handleCopyAddress}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#087F8C] hover:underline pt-1"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{copiedAddress ? "Copied!" : "Copy Address"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#E8F6F4] text-[#087F8C] flex items-center justify-center shrink-0">
+                    <Phone className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-[#202B33]">Phone Numbers</p>
+                    <div className="space-y-1 text-sm text-gray-600 pt-1">
+                      <p><a href={`tel:${CLINIC_CONFIG.phones.primary}`} className="hover:text-[#087F8C] font-semibold">{CLINIC_CONFIG.phones.primary}</a> (Visiting Card)</p>
+                      <p><a href={`tel:${CLINIC_CONFIG.phones.secondary}`} className="hover:text-[#087F8C] font-semibold">{CLINIC_CONFIG.phones.secondary}</a> (Visiting Card)</p>
+                      <p><a href={`tel:${CLINIC_CONFIG.phones.mapsPhone}`} className="hover:text-[#087F8C] font-semibold">{CLINIC_CONFIG.phones.mapsPhone}</a> (Google Maps)</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#E8F6F4] text-[#087F8C] flex items-center justify-center shrink-0">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-[#202B33]">Email Address</p>
+                    <a href={`mailto:${CLINIC_CONFIG.email}`} className="text-sm text-gray-600 hover:text-[#087F8C] font-semibold pt-1 block">
+                      {CLINIC_CONFIG.email}
+                    </a>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#E8F6F4] text-[#087F8C] flex items-center justify-center shrink-0">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-[#202B33]">Visiting Hours</p>
+                    <div className="text-sm text-gray-600 pt-1 space-y-0.5">
+                      <p>Morning: <span className="font-semibold text-[#202B33]">{CLINIC_CONFIG.hours.morning}</span></p>
+                      <p>Evening: <span className="font-semibold text-[#202B33]">{CLINIC_CONFIG.hours.evening}</span></p>
+                      <p className="text-xs text-amber-600 pt-1">{CLINIC_CONFIG.hours.note}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Map & Directions Action Card */}
+            <div className="bg-white p-8 sm:p-10 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-2xl font-bold text-[#202B33] font-['Poppins']">Directions & Navigation</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Easily find us on Veera Desai Road near Dhara Dairy and Axis Bank, Azad Nagar, Andheri West, Mumbai. Click below to open directions in Google Maps.
+                </p>
+                
+                <div className="bg-[#E8F6F4]/50 p-6 rounded-2xl border border-[#087F8C]/10 space-y-3">
+                  <div className="flex items-center gap-2 text-[#087F8C] font-bold text-sm">
+                    <MapPin className="w-5 h-5" />
+                    <span>Landmark Reference</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Near Dhara Dairy, Near Axis Bank, Veera Desai Road, Azad Nagar, Andheri West, Mumbai — 400053.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-4">
+                <a 
+                  href={CLINIC_CONFIG.googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-4 rounded-xl bg-[#087F8C] text-white font-semibold hover:bg-[#066570] shadow-md transition-all flex items-center justify-center gap-2 text-center"
+                >
+                  <MapPin className="w-5 h-5" />
+                  <span>Open Google Maps Directions</span>
+                </a>
+                
+                <a 
+                  href={`tel:${CLINIC_CONFIG.phones.primary}`}
+                  className="w-full py-4 rounded-xl border-2 border-[#087F8C] text-[#087F8C] font-semibold hover:bg-[#E8F6F4] transition-all flex items-center justify-center gap-2 text-center"
+                >
+                  <Phone className="w-5 h-5" />
+                  <span>Call Clinic Now</span>
+                </a>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {}
+      <section id="appointment" className="py-20 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center space-y-4 mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#202B33] font-['Poppins']">
+              Request an Appointment Enquiry
+            </h2>
+            <div className="w-20 h-1.5 bg-[#087F8C] mx-auto rounded-full"></div>
+            <p className="text-gray-600 text-lg leading-relaxed max-w-2xl mx-auto">
+              Fill out the form below to send an appointment enquiry directly via WhatsApp. Your appointment will be confirmed by the clinic.
+            </p>
+          </div>
+
+          <div className="bg-[#E8F6F4]/30 p-8 sm:p-10 rounded-3xl border border-gray-200/80 shadow-lg">
+            <form onSubmit={handleAppointmentSubmit} className="space-y-6">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Full Name */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-[#202B33]">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    type="text"
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={handleFormChange}
+                    placeholder="Enter your full name"
+                    className={`w-full px-4 py-3 rounded-xl bg-white border ${formErrors.fullName ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-[#087F8C] text-sm`}
+                  />
+                  {formErrors.fullName && <p className="text-xs text-red-500 font-medium">{formErrors.fullName}</p>}
+                </div>
+
+                {/* Mobile Number */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-[#202B33]">
+                    Mobile Number (10 digits) <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    type="tel"
+                    name="mobile"
+                    maxLength="10"
+                    value={formData.mobile}
+                    onChange={handleFormChange}
+                    placeholder="e.g., 9876543210"
+                    className={`w-full px-4 py-3 rounded-xl bg-white border ${formErrors.mobile ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-[#087F8C] text-sm`}
+                  />
+                  {formErrors.mobile && <p className="text-xs text-red-500 font-medium">{formErrors.mobile}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Preferred Date */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-[#202B33]">
+                    Preferred Date <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    type="date"
+                    name="date"
+                    value={formData.date}
+                    onChange={handleFormChange}
+                    className={`w-full px-4 py-3 rounded-xl bg-white border ${formErrors.date ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-[#087F8C] text-sm`}
+                  />
+                  {formErrors.date && <p className="text-xs text-red-500 font-medium">{formErrors.date}</p>}
+                </div>
+
+                {/* Preferred Time Session */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-[#202B33]">
+                    Preferred Session
+                  </label>
+                  <select 
+                    name="timeSlot"
+                    value={formData.timeSlot}
+                    onChange={handleFormChange}
+                    className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#087F8C] text-sm"
+                  >
+                    <option value="Morning Session (10 AM - 2 PM)">Morning Session (10:00 AM – 2:00 PM)</option>
+                    <option value="Evening Session (5 PM - 9 PM)">Evening Session (5:00 PM – 9:00 PM)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Treatment Selection */}
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-[#202B33]">
+                  Reason for Visit / Treatment
+                </label>
+                <select 
+                  name="treatment"
+                  value={formData.treatment}
+                  onChange={handleFormChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#087F8C] text-sm"
+                >
+                  {CLINIC_CONFIG.treatments.map(t => (
+                    t.enabled && <option key={t.id} value={t.name}>{t.name}</option>
+                  ))}
+                  <option value="General Consultation">General Consultation</option>
+                  <option value="Other Dental Query">Other Dental Query</option>
+                </select>
+              </div>
+
+              {/* Optional Message */}
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-[#202B33]">
+                  Optional Message / Symptoms
+                </label>
+                <textarea 
+                  name="message"
+                  rows="3"
+                  value={formData.message}
+                  onChange={handleFormChange}
+                  placeholder="Describe any specific details or symptoms..."
+                  className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#087F8C] text-sm"
+                ></textarea>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800">
+                <p className="font-semibold">Notice:</p>
+                <p>This is an appointment request. Your appointment will be confirmed by the clinic upon review. We do not store your details in any automated database or collect sensitive medical records here.</p>
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full py-4 rounded-xl bg-[#087F8C] text-white font-bold hover:bg-[#066570] shadow-lg shadow-[#087F8C]/20 transition-all flex items-center justify-center gap-2 text-base"
+              >
+                <MessageSquare className="w-5 h-5" />
+                <span>Send Appointment Request via WhatsApp</span>
+              </button>
+
+            </form>
+          </div>
+        </div>
+      </section>
+
+      {}
+      <section id="faq" className="py-20 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center space-y-4 mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#202B33] font-['Poppins']">
+              Frequently Asked Questions
+            </h2>
+            <div className="w-20 h-1.5 bg-[#8ABF44] mx-auto rounded-full"></div>
+            <p className="text-gray-600 text-lg leading-relaxed">
+              Find answers to common questions about our clinic, timings, dentist, and treatments.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {[
+              {
+                q: "Where is the clinic located?",
+                a: "The clinic is located at Shop No. 11, Near Dhara Dairy, Near Axis Bank, Veera Desai Road, Azad Nagar, Andheri West, Mumbai, Maharashtra 400053, near Venus Tower."
+              },
+              {
+                q: "Who is the dentist at Eversmile Dental Clinic?",
+                a: "The visiting card lists Dr. Mital Singhi, B.D.S. (Bachelor of Dental Surgery)."
+              },
+              {
+                q: "What are the clinic visiting hours?",
+                a: "The visiting card lists morning hours from 10:00 AM to 2:00 PM and evening hours from 5:00 PM to 9:00 PM. Please contact the clinic to confirm applicable weekly days and slot availability."
+              },
+              {
+                q: "How do I book an appointment?",
+                a: "You can book an appointment by calling our contact numbers or by submitting the appointment enquiry form on this website, which connects directly via WhatsApp."
+              },
+              {
+                q: "Is root canal treatment offered?",
+                a: "Patient feedback and clinical scope mention root canal treatment. Please contact the clinic directly to discuss your specific case and confirm current availability."
+              },
+              {
+                q: "Are dental implants offered?",
+                a: "Dental implant procedures are listed among our proposed care categories. Contact the clinic to confirm current availability and consultation requirements."
+              }
+            ].map((faq, index) => {
+              const isOpen = openFaq === index;
+              return (
+                <div key={index} className="bg-white rounded-2xl border border-gray-200/80 overflow-hidden shadow-sm">
+                  <button 
+                    onClick={() => setOpenFaq(isOpen ? null : index)}
+                    className="w-full px-6 py-5 text-left font-bold text-[#202B33] font-['Poppins'] flex items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors focus:outline-none"
+                  >
+                    <span>{faq.q}</span>
+                    <span className="w-8 h-8 rounded-full bg-[#E8F6F4] text-[#087F8C] flex items-center justify-center shrink-0">
+                      {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <div className="px-6 pb-5 text-gray-600 text-sm leading-relaxed border-t border-gray-100 pt-4">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {}
+      <footer className="bg-[#202B33] text-white pt-16 pb-24 md:pb-16 border-t border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 pb-12 border-b border-gray-800">
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#087F8C] flex items-center justify-center text-white font-bold">
+                  DS
+                </div>
+                <div>
+                  <span className="block font-bold text-lg font-['Poppins'] leading-none">EVERSMILE</span>
+                  <span className="block text-xs font-semibold text-[#8ABF44] tracking-widest uppercase mt-0.5">Dental Clinic</span>
+                </div>
+              </div>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Professional and reliable dental care led by Dr. Mital Singhi (B.D.S.) in Andheri West, Mumbai.
+              </p>
+              <p className="text-xs text-gray-500">
+                Reg. No: {CLINIC_CONFIG.registrationNumber}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold font-['Poppins'] text-white">Quick Links</h3>
+              <ul className="space-y-2.5 text-sm text-gray-400">
+                <li><a href="#home" className="hover:text-white transition-colors">Home</a></li>
+                <li><a href="#about" className="hover:text-white transition-colors">About Us</a></li>
+                <li><a href="#treatments" className="hover:text-white transition-colors">Treatments</a></li>
+                <li><a href="#why-us" className="hover:text-white transition-colors">Why Choose Us</a></li>
+                <li><a href="#reviews" className="hover:text-white transition-colors">Patient Reviews</a></li>
+              </ul>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold font-['Poppins'] text-white">Contact Info</h3>
+              <div className="space-y-2 text-sm text-gray-400">
+                <p>Shop No. 11, Veera Desai Road, Azad Nagar, Andheri West, Mumbai 400053</p>
+                <p>Phone: <a href={`tel:${CLINIC_CONFIG.phones.primary}`} className="hover:text-white">{CLINIC_CONFIG.phones.primary}</a></p>
+                <p>Email: <a href={`mailto:${CLINIC_CONFIG.email}`} className="hover:text-white">{CLINIC_CONFIG.email}</a></p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold font-['Poppins'] text-white">Timings & Legal</h3>
+              <div className="space-y-2 text-sm text-gray-400">
+                <p>Morning: {CLINIC_CONFIG.hours.morning}</p>
+                <p>Evening: {CLINIC_CONFIG.hours.evening}</p>
+                <p className="pt-2">
+                  <button 
+                    onClick={() => setPrivacyModalOpen(true)}
+                    className="text-[#8ABF44] hover:underline text-xs font-semibold"
+                  >
+                    Privacy Policy & Terms
+                  </button>
+                </p>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 gap-4">
+            <p>© {new Date().getFullYear()} Eversmile Dental Clinic (Dr. Mital Singhi). All rights reserved.</p>
+            <p>Website built for clinical excellence in Andheri West, Mumbai.</p>
+          </div>
+        </div>
+      </footer>
+
+      {}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 py-3 shadow-2xl flex items-center justify-around gap-2">
+        <a 
+          href={`tel:${CLINIC_CONFIG.phones.primary}`}
+          className="flex-1 py-2.5 px-3 rounded-xl bg-[#087F8C] text-white font-medium text-xs flex items-center justify-center gap-1.5 shadow-md"
+        >
+          <Phone className="w-4 h-4" />
+          <span>Call</span>
+        </a>
+        
+        <a 
+          href={getWhatsAppLink("Hello Eversmile Dental Clinic, I would like to inquire about your dental services.")}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 py-2.5 px-3 rounded-xl bg-[#8ABF44] text-white font-medium text-xs flex items-center justify-center gap-1.5 shadow-md"
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>WhatsApp</span>
+        </a>
+
+        <a 
+          href={CLINIC_CONFIG.googleMapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 py-2.5 px-3 rounded-xl bg-gray-100 text-gray-700 font-medium text-xs flex items-center justify-center gap-1.5 shadow-md"
+        >
+          <MapPin className="w-4 h-4 text-[#087F8C]" />
+          <span>Directions</span>
+        </a>
+      </div>
+
+      {}
+      {privacyModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white max-w-lg w-full rounded-3xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <h3 className="text-xl font-bold text-[#202B33] font-['Poppins']">Privacy Policy</h3>
+              <button 
+                onClick={() => setPrivacyModalOpen(false)}
+                className="p-2 rounded-xl text-gray-400 hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
+              <p>
+                At Eversmile Dental Clinic, we respect your privacy and are committed to protecting any personal information you share with us.
+              </p>
+              <h4 className="font-bold text-[#202B33]">Appointment Enquiries & WhatsApp</h4>
+              <p>
+                Our appointment form redirects enquiries directly to WhatsApp. We do not store your personal health details or contact information in any automated server database or local storage without your explicit consent.
+              </p>
+              <h4 className="font-bold text-[#202B33]">Contact Information</h4>
+              <p>
+                For any privacy concerns or questions regarding our services, please contact Dr. Mital Singhi directly at our Andheri West clinic or via our official email: {CLINIC_CONFIG.email}.
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-gray-100 flex justify-end">
+              <button 
+                onClick={() => setPrivacyModalOpen(false)}
+                className="px-6 py-2.5 rounded-xl bg-[#087F8C] text-white font-semibold text-sm hover:bg-[#066570]"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+```
